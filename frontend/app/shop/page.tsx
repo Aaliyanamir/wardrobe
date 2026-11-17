@@ -38,6 +38,13 @@ export default function ShopPage() {
   const [isLiveApi, setIsLiveApi] = useState(false);
   const { addToCart, toggleCart } = useStore();
 
+  useEffect(() => {
+    const category = new URLSearchParams(window.location.search).get('category');
+    if (category && categories.some((item) => item.id === category)) {
+      setActiveCategories([category]);
+    }
+  }, []);
+
   const toggleCategory = (cat: string) => {
     setActiveCategories((prev) =>
       prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]

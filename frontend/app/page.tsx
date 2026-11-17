@@ -153,7 +153,7 @@ export default function HomePage() {
           <Link href="/shop" className="hover:text-stone-950 transition-colors">
             ARTICLES
           </Link>
-          <Link href="/studio" className="hover:text-stone-950 transition-colors">
+          <Link href="/contact" className="hover:text-stone-950 transition-colors">
             CONTACT
           </Link>
           <Link href="/lookbook" className="hover:text-stone-950 transition-colors">
@@ -277,6 +277,7 @@ export default function HomePage() {
                     src={prevProduct.images[0]}
                     alt={prevProduct.name}
                     fill
+                    priority
                     className="object-cover group-hover:scale-110 transition-transform duration-500"
                     sizes="160px"
                   />
@@ -450,6 +451,235 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* ================= THE VARDE EDIT ================= */}
+      <section className="bg-[#F5F1EB] px-6 py-20 md:px-12 md:py-28 lg:px-20">
+        <div className="mx-auto grid max-w-7xl items-center gap-12 md:grid-cols-[0.85fr_1.15fr] md:gap-20">
+          <div>
+            <p className="mb-5 text-[10px] font-semibold uppercase tracking-[0.3em] text-[#A36D49]">
+              The VARDE point of view
+            </p>
+            <h2 className="max-w-xl font-serif text-4xl font-medium leading-[1.08] tracking-tight text-stone-900 md:text-6xl">
+              Fewer things.
+              <br />
+              Better made.
+            </h2>
+            <p className="mt-6 max-w-lg text-sm leading-7 text-stone-600 md:text-base">
+              A considered wardrobe starts with pieces that earn their place.
+              Thoughtful materials, quietly confident silhouettes, and the freedom
+              to find your fit before it reaches your door.
+            </p>
+            <Link
+              href="/about"
+              className="mt-8 inline-flex items-center gap-3 border-b border-stone-900 pb-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-stone-900 transition-colors hover:border-[#A36D49] hover:text-[#A36D49]"
+            >
+              Get to know VARDE <ArrowRight size={14} />
+            </Link>
+          </div>
+          <Link
+            href="/lookbook"
+            className="group relative block aspect-[5/4] overflow-hidden bg-[#D9C6B4]"
+          >
+            <Image
+              src="/images/lookbooks/look-001.jpg"
+              alt="The Clean Studio editorial collection"
+              fill
+              sizes="(max-width: 768px) 100vw, 55vw"
+              className="object-cover transition-transform duration-700 group-hover:scale-[1.03]"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-stone-950/60 via-transparent to-transparent" />
+            <div className="absolute bottom-0 left-0 p-6 text-white md:p-9">
+              <p className="text-[10px] uppercase tracking-[0.25em] text-white/75">The latest edit</p>
+              <p className="mt-2 font-serif text-2xl md:text-3xl">The Clean Studio</p>
+              <span className="mt-4 inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em]">
+                Explore the lookbook <ArrowRight size={13} />
+              </span>
+            </div>
+          </Link>
+        </div>
+      </section>
+
+      {/* ================= SHOP BY CATEGORY ================= */}
+      <section className="bg-[#F5F1EB] px-6 pb-20 md:px-12 md:pb-28 lg:px-20">
+        <div className="mx-auto max-w-7xl border-t border-stone-300/80 pt-12 md:pt-16">
+          <div className="mb-8 flex items-end justify-between gap-6 md:mb-10">
+            <div>
+              <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.3em] text-[#A36D49]">
+                Find your uniform
+              </p>
+              <h2 className="font-serif text-3xl font-medium text-stone-900 md:text-4xl">
+                Shop by category
+              </h2>
+            </div>
+            <Link
+              href="/shop"
+              className="hidden items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-stone-700 transition-colors hover:text-[#A36D49] sm:inline-flex"
+            >
+              View all pieces <ArrowRight size={14} />
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-5">
+            {[
+              { label: 'Tops', category: 'tops', image: '/images/products/top-linen-shirt.jpg' },
+              { label: 'Layers', category: 'hoodies', image: '/images/products/hoodie-001.jpg' },
+              { label: 'Outerwear', category: 'jackets', image: '/images/products/jacket-001.jpg' },
+              { label: 'Trousers', category: 'pants', image: '/images/products/pants-001.jpg' },
+            ].map((category, index) => (
+              <Link
+                key={category.category}
+                href={`/shop?category=${category.category}`}
+                className={`group relative block overflow-hidden bg-[#E4D9CE] ${
+                  index % 2 === 1 ? 'mt-6 md:mt-10' : ''
+                }`}
+              >
+                <div className="relative aspect-[4/5]">
+                  <Image
+                    src={category.image}
+                    alt={`${category.label} collection`}
+                    fill
+                    sizes="(max-width: 768px) 50vw, 25vw"
+                    className="object-cover transition-transform duration-700 group-hover:scale-105"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-stone-950/55 via-transparent to-transparent" />
+                  <div className="absolute inset-x-0 bottom-0 flex items-end justify-between p-4 text-white md:p-6">
+                    <span className="font-serif text-xl md:text-2xl">{category.label}</span>
+                    <span className="flex h-9 w-9 items-center justify-center rounded-full border border-white/60 transition-colors group-hover:bg-white group-hover:text-stone-900">
+                      <ArrowRight size={15} />
+                    </span>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ================= THE CURRENT EDIT ================= */}
+      <section className="bg-[#E9E1D8] px-6 py-20 md:px-12 md:py-28 lg:px-20">
+        <div className="mx-auto max-w-7xl">
+          <div className="mb-10 flex items-end justify-between gap-6 md:mb-14">
+            <div>
+              <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.3em] text-[#A36D49]">
+                Considered essentials
+              </p>
+              <h2 className="font-serif text-3xl font-medium text-stone-900 md:text-4xl">
+                Pieces to keep close
+              </h2>
+            </div>
+            <Link
+              href="/shop"
+              className="hidden items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-stone-700 transition-colors hover:text-[#A36D49] sm:inline-flex"
+            >
+              Shop the collection <ArrowRight size={14} />
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-9 md:grid-cols-4 md:gap-6">
+            {products.filter((product) => product.isFeatured).slice(0, 4).map((product, index) => (
+              <motion.div
+                key={product.id}
+                initial={{ opacity: 0, y: 18 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: '-40px' }}
+                transition={{ duration: 0.45, delay: index * 0.08 }}
+              >
+                <Link href={`/shop/${product.id}`} className="group block">
+                  <div className="relative mb-4 aspect-[3/4] overflow-hidden bg-[#D8CEC4]">
+                    <Image
+                      src={product.images[0]}
+                      alt={product.name}
+                      fill
+                      sizes="(max-width: 768px) 50vw, 25vw"
+                      className="object-cover transition-transform duration-700 group-hover:scale-105"
+                    />
+                    {product.isNew && (
+                      <span className="absolute left-3 top-3 bg-[#F5F1EB] px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.16em] text-stone-800">
+                        New
+                      </span>
+                    )}
+                    <span className="absolute bottom-3 right-3 flex h-9 w-9 translate-y-2 items-center justify-center rounded-full bg-[#F5F1EB] text-stone-900 opacity-0 shadow-sm transition-all group-hover:translate-y-0 group-hover:opacity-100">
+                      <ArrowRight size={15} />
+                    </span>
+                  </div>
+                  <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-stone-500">
+                    {product.category}
+                  </p>
+                  <div className="mt-1 flex items-start justify-between gap-3">
+                    <h3 className="text-sm font-medium leading-snug text-stone-900">{product.name}</h3>
+                    <span className="shrink-0 text-sm text-stone-800">${product.price}</span>
+                  </div>
+                  <p className="mt-2 text-xs text-stone-500">{product.colors.length} considered colourways</p>
+                </Link>
+              </motion.div>
+            ))}
+          </div>
+          <Link
+            href="/shop"
+            className="mt-10 inline-flex w-full items-center justify-center gap-2 border border-stone-800 px-6 py-4 text-[10px] font-semibold uppercase tracking-[0.2em] text-stone-900 transition-colors hover:bg-stone-900 hover:text-white sm:hidden"
+          >
+            Shop the collection <ArrowRight size={14} />
+          </Link>
+        </div>
+      </section>
+
+      {/* ================= FIT, MADE PERSONAL ================= */}
+      <section className="bg-[#F5F1EB] px-6 py-20 md:px-12 md:py-28 lg:px-20">
+        <div className="mx-auto grid max-w-7xl overflow-hidden bg-[#B97850] md:grid-cols-2">
+          <div className="relative min-h-[300px] md:min-h-[500px]">
+            <Image
+              src="/images/lookbooks/look-002.jpg"
+              alt="VARDE Urban Utility styling"
+              fill
+              sizes="(max-width: 768px) 100vw, 50vw"
+              className="object-cover"
+            />
+          </div>
+          <div className="flex flex-col justify-center px-7 py-12 text-[#F8F3EC] md:px-12 lg:px-16">
+            <p className="mb-4 text-[10px] font-semibold uppercase tracking-[0.3em] text-white/70">
+              Your fit, in focus
+            </p>
+            <h2 className="max-w-lg font-serif text-3xl font-medium leading-tight md:text-5xl">
+              See the details before you decide.
+            </h2>
+            <p className="mt-5 max-w-md text-sm leading-7 text-white/80">
+              Explore fabric, colour, and proportion in our interactive fitting
+              studio. A more considered way to discover what feels like you.
+            </p>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <Link
+                href="/studio"
+                className="inline-flex items-center gap-2 bg-stone-950 px-6 py-4 text-[10px] font-semibold uppercase tracking-[0.18em] text-white transition-colors hover:bg-stone-800"
+              >
+                <Sparkles size={14} /> Enter the studio
+              </Link>
+              <Link
+                href="/showroom"
+                className="inline-flex items-center gap-2 border border-white/50 px-6 py-4 text-[10px] font-semibold uppercase tracking-[0.18em] text-white transition-colors hover:bg-white/10"
+              >
+                Explore 3D showroom <ArrowRight size={14} />
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ================= ATELIER PROMISE ================= */}
+      <section className="bg-[#F5F1EB] px-6 pb-20 md:px-12 md:pb-28 lg:px-20">
+        <div className="mx-auto max-w-7xl border-y border-stone-300/80 py-10 md:py-14">
+          <div className="grid grid-cols-1 divide-y divide-stone-300/80 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+            {[
+              { number: '01', title: 'Thoughtful materials', copy: 'Natural textures and considered fabrics, chosen for the way they feel and wear.' },
+              { number: '02', title: 'Fit with intention', copy: 'Explore silhouette and sizing with a virtual fitting experience made for you.' },
+              { number: '03', title: 'A lasting wardrobe', copy: 'Versatile pieces designed to move easily through seasons and everyday life.' },
+            ].map((promise) => (
+              <div key={promise.number} className="py-6 sm:px-7 sm:py-0 first:sm:pl-0 last:sm:pr-0">
+                <span className="text-[10px] font-semibold tracking-[0.2em] text-[#A36D49]">{promise.number}</span>
+                <h3 className="mt-3 font-serif text-xl text-stone-900">{promise.title}</h3>
+                <p className="mt-2 max-w-xs text-xs leading-6 text-stone-600">{promise.copy}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ================= COMPLEMENTARY EDITORIAL SHOWCASE ================= */}
       <section className="relative z-10 bg-stone-900 text-stone-100 py-24 px-6 md:px-12 lg:px-20">
         <div className="max-w-7xl mx-auto">
@@ -536,6 +766,12 @@ export default function HomePage() {
             <Link href="/studio" className="hover:text-stone-200">Try-On Studio</Link>
             <Link href="/showroom" className="hover:text-stone-200">Showroom</Link>
             <Link href="/lookbook" className="hover:text-stone-200">Lookbook</Link>
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[10px] tracking-wider uppercase text-stone-500">
+            <Link href="/about" className="hover:text-stone-200">Our Story</Link>
+            <Link href="/contact" className="hover:text-stone-200">Contact</Link>
+            <Link href="/faq" className="hover:text-stone-200">FAQ</Link>
+            <Link href="/shipping-returns" className="hover:text-stone-200">Shipping & Returns</Link>
           </div>
           <p className="text-stone-600 text-[11px]">
             &copy; {new Date().getFullYear()} VARDE Atelier. All rights reserved.
