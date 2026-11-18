@@ -412,12 +412,18 @@ export const lookbooks = [
   },
 ];
 
-export const categories = [
-  { id: 'tops', label: 'Tops', count: 3 },
-  { id: 'hoodies', label: 'Hoodies', count: 2 },
-  { id: 'jackets', label: 'Jackets', count: 3 },
-  { id: 'pants', label: 'Pants', count: 3 },
-];
+const categoryDefinitions = [
+  { id: 'tops', label: 'Tops' },
+  { id: 'hoodies', label: 'Hoodies' },
+  { id: 'jackets', label: 'Jackets' },
+  { id: 'pants', label: 'Pants' },
+] as const;
+
+export const categories = categoryDefinitions.map(({ id, label }) => ({
+  id,
+  label,
+  count: products.filter((product) => product.category === id).length,
+}));
 
 export const getProductById = (id: string) =>
   products.find((p) => p.id === id);
