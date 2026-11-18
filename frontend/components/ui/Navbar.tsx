@@ -88,6 +88,8 @@ export default function Navbar() {
     };
   }, [isOpen]);
 
+  if (pathname === '/studio' || pathname === '/showroom') return null;
+
   return (
     <>
       {/* Dimmed backdrop when sidebar is expanded */}

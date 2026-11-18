@@ -175,13 +175,13 @@ export default function StudioEnvironment({
   return (
     <Canvas
       shadows
-      dpr={[1, 2]}
+      dpr={[1, 1.35]}
       gl={{
         antialias: true,
         toneMapping: THREE.ACESFilmicToneMapping,
         toneMappingExposure: 1.2,
       }}
-      style={{ background: 'transparent' }}
+      style={{ display: 'block', width: '100%', height: '100%', background: 'transparent' }}
     >
       <PerspectiveCamera makeDefault position={cameraPosition} fov={45} />
       <CameraController preset={cameraPreset} />

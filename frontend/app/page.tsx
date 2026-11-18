@@ -96,7 +96,15 @@ export default function HomePage() {
     topColor: selectedColor,
     bottomColor: activeProduct.category === 'pants' ? selectedColor : '#2B3036',
     size: selectedSize,
+    garmentCategory: activeProduct.category,
+    topFitWidth:
+      activeProduct.tags.includes('oversized') || activeProduct.tags.includes('wide-leg')
+        ? 1.1
+        : activeProduct.tags.includes('relaxed')
+        ? 1.06
+        : 1,
     productId: activeProduct.id, // triggers dissolve swap animation on product change
+    topProductId: activeProduct.category === 'pants' ? undefined : activeProduct.id,
     fabricRoughness:
       activeProduct.category === 'hoodies'
         ? 0.88
@@ -197,13 +205,16 @@ export default function HomePage() {
         {/* Real-time 3D Canvas Background */}
         <div className="absolute inset-0 z-0">
           <Canvas
+            frameloop="demand"
+            onCreated={({ invalidate }) => invalidate()}
             shadows
-            dpr={[1, 2]}
+            dpr={[1, 1.35]}
             gl={{
               antialias: true,
               toneMapping: THREE.ACESFilmicToneMapping,
               toneMappingExposure: 1.08,
             }}
+            style={{ display: 'block', width: '100%', height: '100%' }}
           >
             <PerspectiveCamera makeDefault position={[0, 0.22, 4.05]} fov={38} />
 

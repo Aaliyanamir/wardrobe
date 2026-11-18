@@ -3,7 +3,7 @@
 import { Suspense, useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls, Environment, ContactShadows, PerspectiveCamera } from '@react-three/drei';
+import { OrbitControls, ContactShadows, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
 import {
   ChevronLeft,
@@ -20,6 +20,7 @@ import {
   Ruler,
 } from 'lucide-react';
 import Image from 'next/image';
+import Link from 'next/link';
 import toast from 'react-hot-toast';
 import CharacterModel from '@/components/3d/CharacterModel';
 import SizeGuideModal from '@/components/ui/SizeGuideModal';
@@ -46,7 +47,7 @@ const cameraPresets = [
 ] as const;
 
 function SmoothCameraRig({ preset }: { preset: 'full' | 'upper' | 'closeup' }) {
-  const { camera } = useThree();
+  const { camera, invalidate } = useThree();
   const targetPos = useRef(new THREE.Vector3(0, 1, 4.5));
 
   useEffect(() => {
@@ -57,11 +58,13 @@ function SmoothCameraRig({ preset }: { preset: 'full' | 'upper' | 'closeup' }) {
     } else if (preset === 'closeup') {
       targetPos.current.set(0.18, 1.85, 1.35);
     }
-  }, [preset]);
+    invalidate();
+  }, [preset, invalidate]);
 
   useFrame((_, delta) => {
     const s = Math.min(delta * 4.5, 0.25);
     camera.position.lerp(targetPos.current, s);
+    if (camera.position.distanceToSquared(targetPos.current) > 0.0001) invalidate();
   });
 
   return null;
@@ -78,14 +81,22 @@ function StudioCanvas() {
 
   return (
     <Canvas
+      frameloop="demand"
+      onCreated={({ invalidate }) => invalidate()}
       shadows
-      dpr={[1, 2]}
+      dpr={[1, 1.35]}
       gl={{
         antialias: true,
         toneMapping: THREE.ACESFilmicToneMapping,
         toneMappingExposure: 1.2,
       }}
-      style={{ background: bgColor, transition: 'background 1s ease' }}
+      style={{
+        display: 'block',
+        width: '100%',
+        height: '100%',
+        background: bgColor,
+        transition: 'background 1s ease',
+      }}
     >
       <PerspectiveCamera makeDefault position={[0, 1, 4.5]} fov={45} />
       <SmoothCameraRig preset={cameraPreset} />
@@ -94,17 +105,17 @@ function StudioCanvas() {
         {lightingPreset === 'daylight' && (
           <>
             <ambientLight intensity={0.6} />
-            <directionalLight position={[5, 10, 5]} intensity={2.5} castShadow shadow-mapSize={[2048, 2048]} />
+            <hemisphereLight args={['#FFFFFF', '#D6D0C8', 0.7]} />
+            <directionalLight position={[5, 10, 5]} intensity={2.5} castShadow shadow-mapSize={[1024, 1024]} />
             <directionalLight position={[-5, 5, -3]} intensity={0.8} color="#E8F0FF" />
-            <Environment preset="studio" />
           </>
         )}
         {lightingPreset === 'warm' && (
           <>
             <ambientLight intensity={0.4} color="#FFE8D0" />
-            <directionalLight position={[3, 8, 2]} intensity={3} color="#FFD4A0" castShadow shadow-mapSize={[2048, 2048]} />
+            <hemisphereLight args={['#FFE8D0', '#6D5140', 0.6]} />
+            <directionalLight position={[3, 8, 2]} intensity={3} color="#FFD4A0" castShadow shadow-mapSize={[1024, 1024]} />
             <directionalLight position={[-4, 4, -2]} intensity={0.6} color="#C0A080" />
-            <Environment preset="sunset" />
           </>
         )}
         {lightingPreset === 'evening' && (
@@ -113,7 +124,6 @@ function StudioCanvas() {
             <spotLight position={[0, 10, 0]} angle={0.3} penumbra={0.5} intensity={5} castShadow />
             <spotLight position={[-4, 6, 2]} angle={0.4} penumbra={0.6} intensity={2} color="#8080FF" />
             <spotLight position={[4, 6, 2]} angle={0.4} penumbra={0.6} intensity={2} color="#FF8060" />
-            <Environment preset="night" />
           </>
         )}
 
@@ -130,6 +140,8 @@ function StudioCanvas() {
           opacity={lightingPreset === 'evening' ? 0.6 : 0.35}
           scale={8}
           blur={2.5}
+          resolution={256}
+          frames={1}
           color={lightingPreset === 'evening' ? '#000020' : '#111111'}
         />
       </Suspense>
@@ -217,18 +229,23 @@ export default function StudioPage() {
   };
 
   return (
-    <div className="fixed inset-0 flex bg-studio-white overflow-hidden">
+    <div className="fixed inset-0 z-30 flex h-[100dvh] w-screen flex-col overflow-hidden bg-studio-white lg:flex-row">
       {/* ========== LEFT PANEL: GARMENT SELECTOR ========== */}
       <motion.div
-        initial={{ x: -320 }}
-        animate={{ x: 0 }}
-        transition={{ type: 'spring', damping: 30 }}
-        className="w-72 flex-shrink-0 bg-studio-white border-r border-studio-grey flex flex-col z-10 overflow-y-auto"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.2 }}
+        className="order-2 flex max-h-[45dvh] w-full min-h-0 flex-shrink-0 flex-col overflow-y-auto overscroll-contain border-t border-studio-grey bg-studio-white z-10 lg:order-1 lg:h-full lg:max-h-none lg:w-72 lg:border-r lg:border-t-0"
       >
         {/* Header */}
-        <div className="p-6 border-b border-studio-grey pt-24">
-          <p className="text-label text-studio-mid mb-1">Virtual Try-On Studio</p>
-          <h1 className="text-lg font-medium">Build Your Look</h1>
+        <div className="flex items-start justify-between border-b border-studio-grey p-4 lg:p-6">
+          <div>
+            <p className="text-label mb-1 text-studio-mid">Virtual Try-On Studio</p>
+            <h1 className="text-lg font-medium">Build Your Look</h1>
+          </div>
+          <Link href="/" className="text-label mt-1 text-studio-dark transition-colors hover:text-studio-black">
+            Exit
+          </Link>
         </div>
 
         {/* Category Tabs */}
@@ -378,16 +395,16 @@ export default function StudioPage() {
       </motion.div>
 
       {/* ========== CENTER: 3D CANVAS ========== */}
-      <div className="flex-1 relative">
+      <div className="relative order-1 h-[55dvh] min-h-0 w-full flex-none lg:order-2 lg:h-full lg:flex-1">
         <StudioCanvas />
 
         {/* Camera Preset HUD */}
-        <div className="absolute top-24 left-1/2 -translate-x-1/2 flex gap-2 z-10">
+        <div className="absolute left-1/2 top-3 z-10 flex -translate-x-1/2 gap-1 sm:gap-2 lg:top-24">
           {cameraPresets.map((preset) => (
             <button
               key={preset.id}
               onClick={() => setCameraPreset(preset.id)}
-              className={`glass px-4 py-2 text-label transition-all duration-200 ${
+              className={`glass whitespace-nowrap px-2 py-1.5 text-[9px] transition-all duration-200 sm:px-4 sm:py-2 sm:text-[11px] sm:tracking-[0.12em] sm:uppercase ${
                 cameraPreset === preset.id
                   ? 'bg-studio-black text-studio-white border-transparent'
                   : 'text-studio-dark hover:text-studio-black'
@@ -399,12 +416,12 @@ export default function StudioPage() {
         </div>
 
         {/* Lighting Switcher HUD */}
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex gap-3 z-10">
+        <div className="absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 gap-1 sm:bottom-8 sm:gap-3">
           {lightingOptions.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
               onClick={() => setLightingPreset(id)}
-              className={`glass flex items-center gap-2 px-4 py-2.5 text-label transition-all duration-300 ${
+              className={`glass flex items-center gap-1 px-2 py-2 text-[9px] transition-all duration-300 sm:gap-2 sm:px-4 sm:py-2.5 sm:text-[11px] sm:tracking-[0.12em] sm:uppercase ${
                 lightingPreset === id
                   ? 'bg-studio-black text-studio-white'
                   : 'text-studio-dark hover:text-studio-black'
@@ -417,7 +434,7 @@ export default function StudioPage() {
         </div>
 
         {/* Rotation hint */}
-        <div className="absolute bottom-8 right-6 text-label text-studio-mid flex items-center gap-2 z-10">
+        <div className="absolute bottom-8 right-6 z-10 hidden items-center gap-2 text-label text-studio-mid md:flex">
           <Camera size={12} />
           Drag to rotate
         </div>
@@ -425,12 +442,12 @@ export default function StudioPage() {
 
       {/* ========== RIGHT PANEL: OUTFIT SUMMARY ========== */}
       <motion.div
-        initial={{ x: 320 }}
-        animate={{ x: 0 }}
-        transition={{ type: 'spring', damping: 30 }}
-        className="w-72 flex-shrink-0 bg-studio-white border-l border-studio-grey flex flex-col z-10 overflow-y-auto"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.2 }}
+        className="hidden h-full w-72 flex-shrink-0 flex-col overflow-y-auto border-l border-studio-grey bg-studio-white z-10 xl:flex"
       >
-        <div className="p-6 border-b border-studio-grey pt-24">
+        <div className="p-6 border-b border-studio-grey">
           <div className="flex justify-between items-center">
             <h2 className="text-sm font-medium">Your Look</h2>
             <button

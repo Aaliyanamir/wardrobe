@@ -1,10 +1,13 @@
 'use client';
 
-import React, { useRef, useMemo, useEffect } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
+import GarmentDetails from './GarmentDetails';
+
+type GarmentCategory = 'tops' | 'hoodies' | 'jackets' | 'pants';
 
 export interface AvatarCustomization {
   topColor?: string;
@@ -12,9 +15,15 @@ export interface AvatarCustomization {
   shoeColor?: string;
   size?: 'XS' | 'S' | 'M' | 'L' | 'XL' | '2XL';
   garmentType?: 'shirt' | 'tee' | 'hoodie' | 'jacket' | 'blazer';
+  garmentCategory?: GarmentCategory;
   fabricRoughness?: number;
+  bottomRoughness?: number;
+  topFitWidth?: number;
+  bottomFitWidth?: number;
   showGlasses?: boolean;
-  productId?: string; // triggers full swap animation on change
+  productId?: string;
+  topProductId?: string;
+  bottomProductId?: string;
 }
 
 interface AvatarCharacterProps {
@@ -25,15 +34,74 @@ interface AvatarCharacterProps {
   interactiveLookAt?: boolean;
 }
 
-// Proportional chest/torso scaling via spine bone
-const sizeFitOffsets: Record<string, number> = {
+interface AvatarMeshes {
+  top: THREE.SkinnedMesh | null;
+  bottom: THREE.SkinnedMesh | null;
+  footwear: THREE.SkinnedMesh | null;
+  glasses: THREE.SkinnedMesh | null;
+  head: THREE.Bone | null;
+  topScale: THREE.Vector3;
+  bottomScale: THREE.Vector3;
+}
+
+const sizeFitOffsets: Record<NonNullable<AvatarCustomization['size']>, number> = {
   XS: -0.04,
   S: -0.02,
-  M: 0.0,
+  M: 0,
   L: 0.03,
   XL: 0.06,
   '2XL': 0.09,
 };
+
+const getMaterials = (mesh: THREE.SkinnedMesh) =>
+  Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+
+function setMaterialColor(mesh: THREE.SkinnedMesh | null, color: THREE.Color) {
+  if (!mesh) return;
+  for (const material of getMaterials(mesh)) {
+    if (material instanceof THREE.MeshStandardMaterial) {
+      material.color.copy(color);
+    }
+  }
+}
+
+function colorDistance(a: THREE.Color, b: THREE.Color) {
+  return Math.abs(a.r - b.r) + Math.abs(a.g - b.g) + Math.abs(a.b - b.b);
+}
+
+function setMaterialOpacity(mesh: THREE.SkinnedMesh | null, opacity: number) {
+  if (!mesh) return;
+  for (const material of getMaterials(mesh)) {
+    material.transparent = opacity < 1;
+    material.opacity = opacity;
+    material.depthWrite = opacity >= 0.98;
+  }
+}
+
+function setGroupOpacity(group: THREE.Group | null, opacity: number) {
+  if (!group) return;
+  group.traverse((object) => {
+    const mesh = object as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    for (const material of materials) {
+      material.transparent = opacity < 1;
+      material.opacity = opacity;
+      material.depthWrite = opacity >= 0.98;
+    }
+  });
+}
+
+function cloneMaterials(mesh: THREE.SkinnedMesh) {
+  const clone = (material: THREE.Material) => {
+    const materialClone = material.clone();
+    materialClone.userData.avatarClone = true;
+    return materialClone;
+  };
+  mesh.material = Array.isArray(mesh.material)
+    ? mesh.material.map(clone)
+    : clone(mesh.material);
+}
 
 export default function AvatarCharacter({
   position = [0, -1.18, 0.15],
@@ -44,328 +112,222 @@ export default function AvatarCharacter({
 }: AvatarCharacterProps) {
   const { scene } = useGLTF('/models/avatar.glb');
   const groupRef = useRef<THREE.Group>(null);
-  const { pointer } = useThree();
-
-  // Clone scene so multiple instances don't share skeleton bone matrices
-  const clonedScene = useMemo(() => {
-    return SkeletonUtils.clone(scene);
-  }, [scene]);
-
-  // Bone and Mesh references
-  const bonesRef = useRef<{
-    leftArm?: THREE.Bone;
-    rightArm?: THREE.Bone;
-    leftForeArm?: THREE.Bone;
-    rightForeArm?: THREE.Bone;
-    leftHand?: THREE.Bone;
-    rightHand?: THREE.Bone;
-    head?: THREE.Bone;
-    neck?: THREE.Bone;
-    spine?: THREE.Bone;
-    spine2?: THREE.Bone;
-    hips?: THREE.Bone;
-  }>({});
-
-  const meshesRef = useRef<{
-    topMesh?: THREE.SkinnedMesh;
-    bottomMesh?: THREE.SkinnedMesh;
-    footwearMesh?: THREE.SkinnedMesh;
-    skinMesh?: THREE.SkinnedMesh;
-    glassesMesh?: THREE.SkinnedMesh;
-    bodyMesh?: THREE.SkinnedMesh;
-  }>({});
-
-  // Color lerping refs
-  const currentTopColor = useRef(new THREE.Color(customization.topColor || '#7EAECE'));
-  const targetTopColor = useRef(new THREE.Color(customization.topColor || '#7EAECE'));
-  const currentBottomColor = useRef(new THREE.Color(customization.bottomColor || '#2B3036'));
-  const targetBottomColor = useRef(new THREE.Color(customization.bottomColor || '#2B3036'));
-
-  // Outfit swap animation state
-  const swapAnim = useRef({
-    active: false,
-    progress: 0.0,
-    pendingTopColor: null as string | null,
-    pendingBottomColor: null as string | null,
-    colorsApplied: false,
+  const detailsRef = useRef<THREE.Group>(null);
+  const { pointer, invalidate } = useThree();
+  const clonedScene = useMemo(() => SkeletonUtils.clone(scene), [scene]);
+  const meshes = useRef<AvatarMeshes>({
+    top: null,
+    bottom: null,
+    footwear: null,
+    glasses: null,
+    head: null,
+    topScale: new THREE.Vector3(1, 1, 1),
+    bottomScale: new THREE.Vector3(1, 1, 1),
   });
+  const currentTopColor = useRef(new THREE.Color(customization.topColor || '#7EAECE'));
+  const currentBottomColor = useRef(new THREE.Color(customization.bottomColor || '#2B3036'));
+  const targetTopColor = useRef(currentTopColor.current.clone());
+  const targetBottomColor = useRef(currentBottomColor.current.clone());
+  const targetTopWidth = useRef(customization.topFitWidth || 1);
+  const targetBottomWidth = useRef(customization.bottomFitWidth || 1);
+  const targetTopRoughness = useRef(customization.fabricRoughness ?? 0.76);
+  const targetBottomRoughness = useRef(customization.bottomRoughness ?? 0.85);
+  const swap = useRef({ active: false, progress: 0, colorsApplied: false });
 
-  // ===================== BONE SETUP + MATERIAL CLONE =====================
   useEffect(() => {
-    const bones: typeof bonesRef.current = {};
-    const meshes: typeof meshesRef.current = {};
+    const found: AvatarMeshes = {
+      top: null,
+      bottom: null,
+      footwear: null,
+      glasses: null,
+      head: null,
+      topScale: new THREE.Vector3(1, 1, 1),
+      bottomScale: new THREE.Vector3(1, 1, 1),
+    };
 
-    clonedScene.traverse((obj) => {
-      if ((obj as THREE.Mesh).isMesh || (obj as THREE.SkinnedMesh).isSkinnedMesh) {
-        obj.castShadow = true;
-        obj.receiveShadow = true;
+    clonedScene.traverse((object) => {
+      if ((object as THREE.Mesh).isMesh) {
+        object.castShadow = true;
+        object.receiveShadow = true;
       }
 
-      if ((obj as THREE.Bone).isBone) {
-        const name = obj.name; // Use exact name for RPM bones
-        const lname = name.toLowerCase();
-        // ReadyPlayerMe exact bone names: LeftArm_27, LeftForeArm_26, LeftHand_25, RightArm_51, RightForeArm_50, RightHand_49
-        if (name === 'LeftForeArm_26' || lname.includes('leftforearm')) {
-          bones.leftForeArm = obj as THREE.Bone;
-        } else if (name === 'RightForeArm_50' || lname.includes('rightforearm')) {
-          bones.rightForeArm = obj as THREE.Bone;
-        } else if (name === 'LeftArm_27' || (lname.includes('leftarm') && !lname.includes('fore'))) {
-          bones.leftArm = obj as THREE.Bone;
-        } else if (name === 'RightArm_51' || (lname.includes('rightarm') && !lname.includes('fore'))) {
-          bones.rightArm = obj as THREE.Bone;
-        } else if (name === 'LeftHand_25' || (lname.includes('lefthand') && !lname.includes('thumb') && !lname.includes('index') && !lname.includes('middle') && !lname.includes('ring') && !lname.includes('pinky'))) {
-          bones.leftHand = obj as THREE.Bone;
-        } else if (name === 'RightHand_49' || (lname.includes('righthand') && !lname.includes('thumb') && !lname.includes('index') && !lname.includes('middle') && !lname.includes('ring') && !lname.includes('pinky'))) {
-          bones.rightHand = obj as THREE.Bone;
-        } else if (lname.includes('head') && !lname.includes('top')) {
-          bones.head = obj as THREE.Bone;
-        } else if (lname.includes('neck')) {
-          bones.neck = obj as THREE.Bone;
-        } else if (lname.includes('spine2') || lname.includes('spine1')) {
-          bones.spine2 = obj as THREE.Bone;
-        } else if (lname.includes('spine')) {
-          bones.spine = obj as THREE.Bone;
-        } else if (lname.includes('hips') || lname.includes('pelvis')) {
-          bones.hips = obj as THREE.Bone;
-        }
+      if ((object as THREE.Bone).isBone) {
+        const name = object.name.toLowerCase();
+        if (name === 'head' || name.startsWith('head_')) found.head = object as THREE.Bone;
       }
 
-      const mesh = obj as THREE.SkinnedMesh;
-      if (mesh.isSkinnedMesh) {
-        const meshName = mesh.name.toLowerCase();
-        const mat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+      const mesh = object as THREE.SkinnedMesh;
+      if (!mesh.isSkinnedMesh) return;
 
-        if (meshName.includes('outfit_top') || (mat && mat.name?.includes('Outfit_Top'))) {
-          meshes.topMesh = mesh;
-          mesh.material = (mat as THREE.Material).clone();
-          const topMat = mesh.material as THREE.MeshStandardMaterial;
-          if (topMat) {
-            topMat.roughness = customization.fabricRoughness ?? 0.76;
-            topMat.metalness = 0.02;
-            topMat.transparent = true;
-            topMat.opacity = 1.0;
-          }
-        } else if (meshName.includes('outfit_bottom') || (mat && mat.name?.includes('Outfit_Bottom'))) {
-          meshes.bottomMesh = mesh;
-          mesh.material = (mat as THREE.Material).clone();
-          const botMat = mesh.material as THREE.MeshStandardMaterial;
-          if (botMat) {
-            botMat.roughness = 0.85;
-            botMat.metalness = 0.0;
-            botMat.transparent = true;
-            botMat.opacity = 1.0;
-          }
-        } else if (meshName.includes('footwear') || (mat && mat.name?.includes('Outfit_Footwear'))) {
-          meshes.footwearMesh = mesh;
-          mesh.material = (mat as THREE.Material).clone();
-          const fMat = mesh.material as THREE.MeshStandardMaterial;
-          if (fMat) { fMat.transparent = true; fMat.opacity = 1.0; }
-        } else if (meshName.includes('skin') || (mat && mat.name?.includes('Skin'))) {
-          meshes.skinMesh = mesh;
-        } else if (meshName.includes('body') || (mat && mat.name?.includes('Body'))) {
-          meshes.bodyMesh = mesh;
-        } else if (meshName.includes('glasses') || (mat && mat.name?.includes('Glasses'))) {
-          meshes.glassesMesh = mesh;
-          if (customization.showGlasses === false) {
-            mesh.visible = false;
-          }
-        }
+      const materialName = getMaterials(mesh).map((material) => material.name.toLowerCase()).join(' ');
+      if (materialName.includes('outfit_top')) {
+        found.top = mesh;
+        cloneMaterials(mesh);
+        found.topScale.copy(mesh.scale);
+      } else if (materialName.includes('outfit_bottom')) {
+        found.bottom = mesh;
+        cloneMaterials(mesh);
+        found.bottomScale.copy(mesh.scale);
+      } else if (materialName.includes('outfit_footwear')) {
+        found.footwear = mesh;
+      } else if (materialName.includes('glasses')) {
+        found.glasses = mesh;
       }
     });
 
-    bonesRef.current = bones;
-    meshesRef.current = meshes;
-
-    // Apply arm-down pose immediately on mount
-    applyArmDownPose(bones);
-
-  }, [clonedScene, customization.fabricRoughness, customization.showGlasses]);
-
-  // ===================== TRIGGER SWAP ANIMATION ON PRODUCT/COLOR CHANGE =====================
-  useEffect(() => {
-    if (!customization.topColor) return;
-    swapAnim.current.pendingTopColor = customization.topColor;
-    swapAnim.current.pendingBottomColor = customization.bottomColor || '#2B3036';
-    swapAnim.current.progress = 0.0;
-    swapAnim.current.active = true;
-    swapAnim.current.colorsApplied = false;
-  }, [customization.topColor, customization.productId]);
+    meshes.current = found;
+    setMaterialColor(found.top, currentTopColor.current);
+    setMaterialColor(found.bottom, currentBottomColor.current);
+  }, [clonedScene]);
 
   useEffect(() => {
-    if (customization.bottomColor && !swapAnim.current.active) {
-      targetBottomColor.current.set(customization.bottomColor);
+    if (meshes.current.glasses) {
+      meshes.current.glasses.visible = customization.showGlasses !== false;
     }
-  }, [customization.bottomColor]);
+  }, [clonedScene, customization.showGlasses]);
 
-  // Proportional sizing via spine bone
   useEffect(() => {
-    const size = customization.size || 'M';
-    const offset = sizeFitOffsets[size] ?? 0;
-    if (bonesRef.current.spine2) {
-      const s = 1.0 + offset;
-      bonesRef.current.spine2.scale.set(s, 1.0, s);
+    targetTopColor.current.set(customization.topColor || '#7EAECE');
+    targetBottomColor.current.set(customization.bottomColor || '#2B3036');
+    targetTopWidth.current = customization.topFitWidth || 1;
+    targetBottomWidth.current = customization.bottomFitWidth || 1;
+    targetTopRoughness.current = customization.fabricRoughness ?? 0.76;
+    targetBottomRoughness.current = customization.bottomRoughness ?? 0.85;
+    invalidate();
+  }, [
+    customization.bottomColor,
+    customization.bottomFitWidth,
+    customization.bottomRoughness,
+    customization.fabricRoughness,
+    customization.size,
+    customization.topColor,
+    customization.topFitWidth,
+    invalidate,
+  ]);
+
+  useEffect(() => {
+    swap.current = { active: true, progress: 0, colorsApplied: false };
+    invalidate();
+  }, [customization.productId, customization.topColor, customization.bottomColor, invalidate]);
+
+  useEffect(
+    () => () => {
+      clonedScene.traverse((object) => {
+        const mesh = object as THREE.SkinnedMesh;
+        if (!mesh.isSkinnedMesh) return;
+        const materials = getMaterials(mesh);
+        for (const material of materials) {
+          if (material.userData.avatarClone) material.dispose();
+        }
+      });
+    },
+    [clonedScene]
+  );
+
+  useFrame((_, delta) => {
+    const avatar = meshes.current;
+    let needsAnotherFrame = false;
+
+    const fit = customization.size ? 1 + (sizeFitOffsets[customization.size] ?? 0) : 1;
+    for (const [mesh, baseScale, targetWidth] of [
+      [avatar.top, avatar.topScale, targetTopWidth.current],
+      [avatar.bottom, avatar.bottomScale, targetBottomWidth.current],
+    ] as const) {
+      if (!mesh) continue;
+      const targetX = baseScale.x * targetWidth * fit;
+      const targetZ = baseScale.z * fit;
+      mesh.scale.x = THREE.MathUtils.damp(mesh.scale.x, targetX, 5, delta);
+      mesh.scale.z = THREE.MathUtils.damp(mesh.scale.z, targetZ, 5, delta);
+      needsAnotherFrame ||= Math.abs(mesh.scale.x - targetX) + Math.abs(mesh.scale.z - targetZ) > 0.001;
     }
-  }, [customization.size]);
 
-  // ===================== FRAME LOOP =====================
-  useFrame((state, delta) => {
-    const t = state.clock.getElapsedTime();
-    const bones = bonesRef.current;
-    const meshes = meshesRef.current;
-
-    // Enforce straight-down arm pose every frame (overrides GLB A-pose)
-    applyArmDownPose(bones);
-
-    // Natural breathing on spine
-    const breath = Math.sin(t * 1.6) * 0.006;
-    if (bones.spine2) {
-      bones.spine2.rotation.x = breath;
+    for (const [mesh, targetRoughness] of [
+      [avatar.top, targetTopRoughness.current],
+      [avatar.bottom, targetBottomRoughness.current],
+    ] as const) {
+      if (!mesh) continue;
+      for (const material of getMaterials(mesh)) {
+        if (!(material instanceof THREE.MeshStandardMaterial)) continue;
+        material.roughness = THREE.MathUtils.damp(material.roughness, targetRoughness, 4, delta);
+        needsAnotherFrame ||= Math.abs(material.roughness - targetRoughness) > 0.002;
+      }
     }
 
-    // Interactive mouse head tracking
-    if (interactiveLookAt && bones.head) {
-      const targetYaw = pointer.x * 0.18;
-      const targetPitch = -pointer.y * 0.12;
-      bones.head.rotation.y = THREE.MathUtils.lerp(bones.head.rotation.y, targetYaw, delta * 3.5);
-      bones.head.rotation.x = THREE.MathUtils.lerp(bones.head.rotation.x, targetPitch, delta * 3.5);
+    if (interactiveLookAt && avatar.head) {
+      const yaw = pointer.x * 0.18;
+      const pitch = -pointer.y * 0.12;
+      const head = avatar.head;
+      const nextYaw = THREE.MathUtils.damp(head.rotation.y, yaw, 3.5, delta);
+      const nextPitch = THREE.MathUtils.damp(head.rotation.x, pitch, 3.5, delta);
+      head.rotation.y = nextYaw;
+      head.rotation.x = nextPitch;
+      needsAnotherFrame ||= Math.abs(nextYaw - yaw) + Math.abs(nextPitch - pitch) > 0.002;
     }
 
-    // ---- OUTFIT SWAP DISSOLVE ANIMATION ----
-    if (swapAnim.current.active) {
-      swapAnim.current.progress = Math.min(swapAnim.current.progress + delta * 4.5, 1.0);
-      const p = swapAnim.current.progress;
+    if (swap.current.active) {
+      swap.current.progress = Math.min(swap.current.progress + delta * 4.5, 1);
+      const progress = swap.current.progress;
+      const midpoint = 0.45;
+      const opacity = progress < midpoint
+        ? 1 - progress / midpoint
+        : (progress - midpoint) / (1 - midpoint);
 
-      let opacity: number;
-      if (p < 0.45) {
-        // Phase 1: fade out 1 → 0
-        opacity = 1.0 - p / 0.45;
+      if (progress >= midpoint && !swap.current.colorsApplied) {
+        currentTopColor.current.copy(targetTopColor.current);
+        currentBottomColor.current.copy(targetBottomColor.current);
+        swap.current.colorsApplied = true;
+      }
+
+      if (progress >= 1) {
+        swap.current.active = false;
+        setMaterialOpacity(avatar.top, 1);
+        setMaterialOpacity(avatar.bottom, 1);
+        setMaterialOpacity(avatar.footwear, 1);
+        setGroupOpacity(detailsRef.current, 1);
       } else {
-        // Phase 2: apply new colors once at midpoint, then fade in 0 → 1
-        if (!swapAnim.current.colorsApplied) {
-          if (swapAnim.current.pendingTopColor) {
-            currentTopColor.current.set(swapAnim.current.pendingTopColor);
-            targetTopColor.current.set(swapAnim.current.pendingTopColor);
-          }
-          if (swapAnim.current.pendingBottomColor) {
-            currentBottomColor.current.set(swapAnim.current.pendingBottomColor);
-            targetBottomColor.current.set(swapAnim.current.pendingBottomColor);
-          }
-          swapAnim.current.colorsApplied = true;
-        }
-        opacity = (p - 0.45) / 0.55;
-      }
-
-      const clampedOpacity = Math.max(0, Math.min(1, opacity));
-
-      if (meshes.topMesh?.material) {
-        const mat = meshes.topMesh.material as THREE.MeshStandardMaterial;
-        mat.transparent = true;
-        mat.opacity = clampedOpacity;
-        if (mat.color) mat.color.copy(currentTopColor.current);
-        if (customization.fabricRoughness !== undefined) mat.roughness = customization.fabricRoughness;
-      }
-      if (meshes.bottomMesh?.material) {
-        const mat = meshes.bottomMesh.material as THREE.MeshStandardMaterial;
-        mat.transparent = true;
-        mat.opacity = clampedOpacity;
-        if (mat.color) mat.color.copy(currentBottomColor.current);
-      }
-      if (meshes.footwearMesh?.material) {
-        const mat = meshes.footwearMesh.material as THREE.MeshStandardMaterial;
-        mat.transparent = true;
-        mat.opacity = Math.max(0.1, clampedOpacity);
-      }
-
-      // Elastic scale pop on fade-in
-      const bounceScale = p < 0.45 ? 1.0 : 1.0 + Math.sin(((p - 0.45) / 0.55) * Math.PI) * 0.022;
-      if (groupRef.current) {
-        groupRef.current.scale.setScalar(scale * bounceScale);
-      }
-
-      if (p >= 1.0) {
-        swapAnim.current.active = false;
-        swapAnim.current.pendingTopColor = null;
-        swapAnim.current.pendingBottomColor = null;
-        if (meshes.topMesh?.material) {
-          (meshes.topMesh.material as THREE.MeshStandardMaterial).opacity = 1.0;
-        }
-        if (meshes.bottomMesh?.material) {
-          (meshes.bottomMesh.material as THREE.MeshStandardMaterial).opacity = 1.0;
-        }
-        if (meshes.footwearMesh?.material) {
-          (meshes.footwearMesh.material as THREE.MeshStandardMaterial).opacity = 1.0;
-        }
+        setMaterialOpacity(avatar.top, opacity);
+        setMaterialOpacity(avatar.bottom, opacity);
+        setMaterialOpacity(avatar.footwear, Math.max(0.1, opacity));
+        setGroupOpacity(detailsRef.current, opacity);
         if (groupRef.current) {
-          groupRef.current.scale.setScalar(scale);
+          const bounce = 1 + Math.sin(((progress - midpoint) / (1 - midpoint)) * Math.PI) * 0.022;
+          groupRef.current.scale.setScalar(scale * bounce);
         }
+        needsAnotherFrame = true;
       }
     } else {
-      // Normal color crossfade when no swap active
-      currentTopColor.current.lerp(targetTopColor.current, Math.min(delta * 7, 1));
-      currentBottomColor.current.lerp(targetBottomColor.current, Math.min(delta * 7, 1));
+      setGroupOpacity(detailsRef.current, 1);
+      const blend = Math.min(delta * 7, 1);
+      currentTopColor.current.lerp(targetTopColor.current, blend);
+      currentBottomColor.current.lerp(targetBottomColor.current, blend);
+      setMaterialColor(avatar.top, currentTopColor.current);
+      setMaterialColor(avatar.bottom, currentBottomColor.current);
 
-      if (meshes.topMesh?.material) {
-        const mat = meshes.topMesh.material as THREE.MeshStandardMaterial;
-        if (mat.color) mat.color.copy(currentTopColor.current);
-        if (customization.fabricRoughness !== undefined) {
-          mat.roughness = THREE.MathUtils.lerp(mat.roughness, customization.fabricRoughness, delta * 4);
-        }
-      }
-      if (meshes.bottomMesh?.material) {
-        const mat = meshes.bottomMesh.material as THREE.MeshStandardMaterial;
-        if (mat.color) mat.color.copy(currentBottomColor.current);
-      }
+      const colorDelta =
+        colorDistance(currentTopColor.current, targetTopColor.current) +
+        colorDistance(currentBottomColor.current, targetBottomColor.current);
+      needsAnotherFrame ||= colorDelta > 0.002;
+    }
+
+    if (needsAnotherFrame) invalidate();
+    if (!swap.current.active && groupRef.current && groupRef.current.scale.x !== scale) {
+      groupRef.current.scale.setScalar(scale);
     }
   });
 
   return (
     <group ref={groupRef} position={position} rotation={rotation} scale={scale}>
       <primitive object={clonedScene} />
+      <group ref={detailsRef}>
+        <GarmentDetails
+          topProductId={customization.topProductId}
+          bottomProductId={customization.bottomProductId}
+          topColor={customization.topColor || '#7EAECE'}
+          bottomColor={customization.bottomColor || '#2B3036'}
+        />
+      </group>
     </group>
   );
-}
-
-// ===================== ARM-DOWN POSE HELPER =====================
-// ReadyPlayerMe A-pose has ~57° arm raise on X/Z axis.
-// We override bone rotations every frame to force mannequin standing pose.
-function applyArmDownPose(bones: {
-  leftArm?: THREE.Bone;
-  rightArm?: THREE.Bone;
-  leftForeArm?: THREE.Bone;
-  rightForeArm?: THREE.Bone;
-  leftHand?: THREE.Bone;
-  rightHand?: THREE.Bone;
-}) {
-  if (bones.leftArm) {
-    bones.leftArm.rotation.order = 'XYZ';
-    bones.leftArm.rotation.x = 0.0;
-    bones.leftArm.rotation.y = 0.06;
-    bones.leftArm.rotation.z = -1.32;
-  }
-  if (bones.rightArm) {
-    bones.rightArm.rotation.order = 'XYZ';
-    bones.rightArm.rotation.x = 0.0;
-    bones.rightArm.rotation.y = -0.06;
-    bones.rightArm.rotation.z = 1.32;
-  }
-  if (bones.leftForeArm) {
-    bones.leftForeArm.rotation.order = 'XYZ';
-    bones.leftForeArm.rotation.x = 0.0;
-    bones.leftForeArm.rotation.y = 0.0;
-    bones.leftForeArm.rotation.z = -0.06;
-  }
-  if (bones.rightForeArm) {
-    bones.rightForeArm.rotation.order = 'XYZ';
-    bones.rightForeArm.rotation.x = 0.0;
-    bones.rightForeArm.rotation.y = 0.0;
-    bones.rightForeArm.rotation.z = 0.06;
-  }
-  if (bones.leftHand) {
-    bones.leftHand.rotation.set(0, 0, 0);
-  }
-  if (bones.rightHand) {
-    bones.rightHand.rotation.set(0, 0, 0);
-  }
 }
 
 useGLTF.preload('/models/avatar.glb');

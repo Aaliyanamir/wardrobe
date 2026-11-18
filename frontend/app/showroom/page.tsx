@@ -242,13 +242,13 @@ export default function ShowroomPage() {
         <Suspense fallback={<ShowroomLoader />}>
           <Canvas
             shadows
-            dpr={[1, 2]}
+            dpr={[1, 1.35]}
             gl={{
               antialias: true,
               toneMapping: THREE.ACESFilmicToneMapping,
               toneMappingExposure: 1.15,
             }}
-            style={{ background: '#ECE8E1' }}
+            style={{ display: 'block', width: '100%', height: '100%', background: '#ECE8E1' }}
             onClick={() => {
               if (selectedLook) {
                 // Clicking on empty floor dismisses close-up

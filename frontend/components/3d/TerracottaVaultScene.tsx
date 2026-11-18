@@ -167,8 +167,8 @@ export default function TerracottaVaultScene({
         intensity={2.8}
         color="#FFF1DD"
         castShadow
-        shadow-mapSize-width={2048}
-        shadow-mapSize-height={2048}
+        shadow-mapSize-width={1024}
+        shadow-mapSize-height={1024}
         shadow-camera-near={0.5}
         shadow-camera-far={25}
         shadow-camera-left={-6}
@@ -290,12 +290,14 @@ export default function TerracottaVaultScene({
         scale={8.5}
         blur={1.6}
         far={2.2}
+        resolution={256}
+        frames={1}
         color="#321A10"
       />
 
       {/* Floating sunlit dust motes */}
       <Sparkles
-        count={35}
+        count={16}
         scale={[6, 4, 4]}
         position={[0, 0.8, 0]}
         size={1.4}

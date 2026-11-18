@@ -17,13 +17,15 @@ import SizeGuideModal from '@/components/ui/SizeGuideModal';
 import toast from 'react-hot-toast';
 
 // Mini 3D avatar viewer for PDP
-function GarmentViewer({ color }: { color: string }) {
+function GarmentViewer({ color, product }: { color: string; product: Product }) {
+  const isPants = product.category === 'pants';
+
   return (
     <Canvas
       shadows
-      dpr={[1, 2]}
+      dpr={[1, 1.35]}
       gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping }}
-      style={{ background: '#EBE7E1' }}
+      style={{ display: 'block', width: '100%', height: '100%', background: '#EBE7E1' }}
     >
       <PerspectiveCamera makeDefault position={[0, 0.45, 2.85]} fov={42} />
       <ambientLight intensity={0.75} />
@@ -34,7 +36,14 @@ function GarmentViewer({ color }: { color: string }) {
         <AvatarCharacter
           position={[0, -0.9, 0]}
           scale={1.05}
-          customization={{ topColor: color, size: 'M' }}
+          customization={{
+            topColor: isPants ? '#7EAECE' : color,
+            bottomColor: isPants ? color : '#2B3036',
+            topProductId: isPants ? undefined : product.id,
+            bottomProductId: isPants ? product.id : undefined,
+            productId: product.id,
+            size: 'M',
+          }}
           interactiveLookAt={true}
         />
         <ContactShadows position={[0, -0.9, 0]} opacity={0.5} scale={5} blur={1.8} />
@@ -227,7 +236,7 @@ export default function ProductDetailPage({
                   exit={{ opacity: 0 }}
                   className="aspect-[3/4] bg-studio-grey"
                 >
-                  <GarmentViewer color={selectedColor.hex} />
+                  <GarmentViewer color={selectedColor.hex} product={product} />
                 </motion.div>
               )}
             </AnimatePresence>

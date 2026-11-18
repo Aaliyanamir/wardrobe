@@ -251,6 +251,11 @@ export function DisplayPedestal({
   const spotlightRef = useRef<THREE.SpotLight>(null);
 
   const totalPrice = calculateLookTotal(look.items);
+  const topItem =
+    look.items.find((item) => item.category === 'jackets') ||
+    look.items.find((item) => item.category === 'hoodies') ||
+    look.items.find((item) => item.category === 'tops');
+  const pantsItem = look.items.find((item) => item.category === 'pants');
 
   // Subtle continuous slow rotation for display
   useFrame((_, delta) => {
@@ -279,8 +284,6 @@ export function DisplayPedestal({
         penumbra={0.6}
         intensity={2.0}
         color={isSelected ? '#FFF8EE' : hovered ? '#FFFFFF' : '#F5EFE6'}
-        castShadow
-        shadow-mapSize={[1024, 1024]}
       />
 
       {/* Floating Animated Display */}
@@ -312,6 +315,9 @@ export function DisplayPedestal({
             customization={{
               topColor: look.primaryColor,
               bottomColor: look.id === 'look-001' ? '#25355E' : look.id === 'look-004' ? '#D5CDC0' : '#1F2226',
+              topProductId: topItem?.productId,
+              bottomProductId: pantsItem?.productId,
+              productId: topItem?.productId,
               fabricRoughness: look.fabricType === 'leather' ? 0.45 : 0.8,
             }}
             interactiveLookAt={hovered}
@@ -396,6 +402,8 @@ export function DisplayPedestal({
         scale={2.2}
         blur={1.8}
         far={2}
+        resolution={128}
+        frames={1}
       />
     </group>
   );
@@ -527,17 +535,17 @@ function ShowroomFloor() {
     <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
       <planeGeometry args={[24, 22]} />
       <MeshReflectorMaterial
-        blur={[350, 80]}
-        resolution={1024}
-        mixBlur={1.2}
-        mixStrength={25}
+        blur={[160, 40]}
+        resolution={512}
+        mixBlur={0.9}
+        mixStrength={16}
         roughness={0.7}
-        depthScale={1.4}
+        depthScale={1}
         minDepthThreshold={0.2}
         maxDepthThreshold={1.8}
         color="#DDD9D0"
         metalness={0.4}
-        mirror={0.45}
+        mirror={0.3}
       />
     </mesh>
   );
